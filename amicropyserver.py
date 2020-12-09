@@ -29,9 +29,10 @@ import re
 import socket
 import sys
 import io
+import asyncio
 
 
-class MicroPyServer(object):
+class aMicroPyServer(object):
 
     def __init__(self, host="0.0.0.0", port=80):
         """ Constructor """

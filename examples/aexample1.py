@@ -7,10 +7,11 @@ Needed ESP8266 or ESP32 board
 """
 import esp
 import network
-from micropyserver import MicroPyServer
+from amicropyserver import aMicroPyServer
+import uasyncio as asyncio
 
-wlan_id = "your wi-fi"
-wlan_pass = "your password"
+wlan_id = "MikroTik_mAP"  # "your wi-fi"
+wlan_pass = "1qazxsw2"  # "your password"
 
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
@@ -26,7 +27,13 @@ def show_info_page(request):
     server.send("THIS IS INFO PAGE")
 
 
-server = MicroPyServer()
+server = aMicroPyServer()
 server.add_route("/info", show_info_page)
 server.add_route("/", show_index_page)
-server.start()
+
+try:
+    asyncio.run(server.start())
+except KeyboardInterrupt:
+    print('Interrupted')  # This mechanism doesn't work on Unix build.
+finally:
+    _ = asyncio.new_event_loop()
