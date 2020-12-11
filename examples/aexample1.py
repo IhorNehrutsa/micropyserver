@@ -19,15 +19,21 @@ wlan_pass = "your password"
 wlan_id = "MikroTik_mAP"
 wlan_pass = "1qazxsw2"
 
-wlan_id = "TP-LINK-359734"
-wlan_pass = "+380482359734"
+# wlan_id = "telecard208"
+# wlan_pass = "208208208"
+
+# wlan_id = "TP-LINK-359734"
+# wlan_pass = "+380482359734"
 
 wlan = network.WLAN(network.STA_IF)
 if wlan.isconnected():
+    print("  wlan.ifconfig():", wlan.ifconfig())
     wlan.disconnect()
-    print('disconnected')
+    if not wlan.isconnected():
+        print('wlan disconnected')
     
 wlan.active(False)  # Comment out this line to throw an exception when wlan.ifconfig('dhcp') will execute 
+#wlan.config (dhcp_hostname = "espressif12345")
 wlan.active(True)
 try:
     print("try: wlan.ifconfig('dhcp')", end=' ')
@@ -75,6 +81,8 @@ try:
 except Exception as e:
     print(e)
 print("wlan.config('dhcp_hostname')", wlan.config('dhcp_hostname'))
+wlan.config (dhcp_hostname = "espressif12345")
+print("wlan.config('dhcp_hostname')", wlan.config('dhcp_hostname'))
 
 print(socket.getaddrinfo(wlan.ifconfig()[0], 80)[0][-1])
 print(socket.getaddrinfo('www.micropython.org', 80)[0][-1])
@@ -84,7 +92,7 @@ print(socket.getaddrinfo('127.0.0.1', 80)[0][-1])
 try:
     #print("try: socket.getaddrinfo(wlan.config('dhcp_hostname'), 80)[0][-1]", end=' ')
     #print(socket.getaddrinfo(wlan.config('dhcp_hostname'), 80)[0][-1])
-    print(socket.getaddrinfo('espressif', 80)[0][-1])
+    print(socket.getaddrinfo('espressif12345', 80)[0][-1])
     #print("- Ok")
 except Exception as e:
     print("")
