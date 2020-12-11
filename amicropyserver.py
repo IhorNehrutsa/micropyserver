@@ -29,25 +29,36 @@ import re
 import socket
 import sys
 import io
-import asyncio
+import uasyncio as asyncio
 
 
 class aMicroPyServer(object):
 
-    def __init__(self, host="0.0.0.0", port=80):
+    def __init__(self, host="0.0.0.0", port=80, backlog=5, timeout=20):
         """ Constructor """
         self._host = host
         self._port = port
-        self._routes = []
-        self._connect = None
-        self._on_request_handler = None
 
-    def start(self):
+        self._routes = []
+        self._on_request_handler = None
+        
+        self.backlog = backlog
+        self.timeout = timeout
+        
+        self.swriter = None
+
+    async def start(self):
         """ Start server """
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind((self._host, self._port))
-        sock.listen(1)
+        print('Awaiting client connection.')
+        self.server = await asyncio.start_server(self.run_client, self._host, self._port, self.backlog)
+        while True:
+            await asyncio.sleep(100)
+
+    async def run_client(self, sreader, swriter):
+        print('Got connection from client', self)
+        #self.sreader = sreader
+        self.swriter = swriter
+        '''
         while True:
             try:
                 self._connect, address = sock.accept()
@@ -67,26 +78,63 @@ class aMicroPyServer(object):
                     self.internal_error(e)
             finally:
                 self._connect.close()
+        '''
+        try:
+            while True:
+                try:
+                    res = await asyncio.wait_for(sreader.readline(), self.timeout)
+                except asyncio.TimeoutError:
+                    res = b''
+                if res == b'':
+                    raise OSError
+                print('Received {} from client {}'.format(res, 12345))
+                
+                request = res
+                try:
+                    route = self.find_route(request)
+                    if route:
+                        route["handler"](request)
+                    else:
+                        self.not_found()
+                except Exception as e:
+                        self.internal_error(e)
+                        
+        except OSError:
+            pass
+        print('Client {} disconnect.'.format(self))
+        await sreader.wait_closed()
+        print('Client {} socket closed.'.format(self))
+
+    def close(self):
+        print('Closing server')
+        self.server.close()
+        await self.server.wait_closed()
+        print('Server closed')
 
     def add_route(self, path, handler, method="GET"):
         """ Add new route  """
         self._routes.append({"path": path, "handler": handler, "method": method})
 
+    def _write(self, response):
+        self.swriter.write(response)
+        await self.swriter.drain() 
+        
     def send(self, response, status=200, content_type="Content-Type: text/plain", extra_headers=[]):
         """ Send response to client """
-        if self._connect is None:
+
+        if self.swriter is None:
             raise Exception("Can't send response, no connection instance")
 
         status_message = {200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found",
                           500: "Internal Server Error"}
-        self._connect.sendall("HTTP/1.0 " + str(status) + " " + status_message[status] + "\r\n")
-        self._connect.sendall(content_type + "\r\n")
+        self._write("HTTP/1.0 " + str(status) + " " + status_message[status] + "\r\n")
+        self._write(content_type + "\r\n")
         for header in extra_headers:
-            self._connect.sendall(header + "\r\n")
-        self._connect.sendall("X-Powered-By: MicroPyServer\r\n")
-        self._connect.sendall("\r\n")
-        self._connect.sendall(response)
-
+            self._write(header + "\r\n")
+        self._write("X-Powered-By: MicroPyServer\r\n")
+        self._write("\r\n")
+        self._write(response)
+        
     def find_route(self, request):
         """ Find route """
         lines = request.split("\r\n")
