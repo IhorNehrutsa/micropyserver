@@ -55,7 +55,7 @@ class aMicroPyServer(object):
             await asyncio.sleep(100)
 
     async def run_client(self, sreader, swriter):
-        print('Got connection from client', self)
+        print('Got connection from client', self, sreader, swriter)
         #self.sreader = sreader
         self.swriter = swriter
         '''
@@ -89,15 +89,18 @@ class aMicroPyServer(object):
                     raise OSError
                 print('Received {} from client {}'.format(res, 12345))
                 
-                request = res
+                request = str(res, "utf8")
                 try:
                     route = self.find_route(request)
+                    print("route", route)
                     if route:
                         route["handler"](request)
                     else:
                         self.not_found()
                 except Exception as e:
-                        self.internal_error(e)
+                    print(e)
+                    self.internal_error(e)
+                    raise
                         
         except OSError:
             pass
@@ -137,20 +140,25 @@ class aMicroPyServer(object):
         
     def find_route(self, request):
         """ Find route """
+        print('self._routes', self._routes)
+        print(type(request), '>>>', request, '<<<')
         lines = request.split("\r\n")
-        method = re.search("^([A-Z]+)", lines[0]).group(1)
-        path = re.search("^[A-Z]+\\s+(/[-a-zA-Z0-9_.]*)", lines[0]).group(1)
-        for route in self._routes:
-            if method != route["method"]:
-                continue
-            if path == route["path"]:
-                return route
-            else:
-                match = re.search("^" + route["path"] + "$", path)
-                if match:
-                    print(method, path, route["path"])
+        print('lines', lines)
+        if len(lines[0]) > 0:
+            method = re.search("^([A-Z]+)", lines[0]).group(1)
+            for route in self._routes:
+                if method != route["method"]:
+                    continue
+                path = re.search("^[A-Z]+\\s+(/[-a-zA-Z0-9_.]*)", lines[0]).group(1)
+                if path == route["path"]:
                     return route
-
+                else:
+                    match = re.search("^" + route["path"] + "$", path)
+                    if match:
+                        print(method, path, route["path"])
+                        return route
+        return None
+    
     def not_found(self):
         """ Not found action """
         self.send("404", status=404)
@@ -158,7 +166,8 @@ class aMicroPyServer(object):
     def internal_error(self, error):
         """ Catch error action """
         output = io.StringIO()
-        sys.print_exception(error, output)
+        #sys.print_exception(error, output)
+        print(error)
         str_error = output.getvalue()
         output.close()
         self.send("Error: " + str_error, status=500)

@@ -32,12 +32,12 @@ if wlan.isconnected():
     if not wlan.isconnected():
         print('wlan disconnected')
     
-wlan.active(False)  # Comment out this line to throw an exception when wlan.ifconfig('dhcp') will execute 
+#wlan.active(False)  # Comment out this line to throw an exception when wlan.ifconfig('dhcp') will execute 
 #wlan.config (dhcp_hostname = "espressif12345")
 wlan.active(True)
 try:
     print("try: wlan.ifconfig('dhcp')", end=' ')
-    wlan.ifconfig('dhcp')
+    #wlan.ifconfig('dhcp')
     print("- Ok")
 except Exception as e:
     print("")
@@ -81,32 +81,29 @@ try:
 except Exception as e:
     print(e)
 print("wlan.config('dhcp_hostname')", wlan.config('dhcp_hostname'))
-wlan.config (dhcp_hostname = "espressif12345")
-print("wlan.config('dhcp_hostname')", wlan.config('dhcp_hostname'))
+#wlan.config (dhcp_hostname = "espressif12345")
+#print("wlan.config('dhcp_hostname')", wlan.config('dhcp_hostname'))
 
-print(socket.getaddrinfo(wlan.ifconfig()[0], 80)[0][-1])
-print(socket.getaddrinfo('www.micropython.org', 80)[0][-1])
-print(socket.getaddrinfo('micropython.org', 80)[0][-1])
-print(socket.getaddrinfo('google.com', 80)[0][-1])
-print(socket.getaddrinfo('127.0.0.1', 80)[0][-1])
-try:
-    #print("try: socket.getaddrinfo(wlan.config('dhcp_hostname'), 80)[0][-1]", end=' ')
-    #print(socket.getaddrinfo(wlan.config('dhcp_hostname'), 80)[0][-1])
-    print(socket.getaddrinfo('espressif12345', 80)[0][-1])
-    #print("- Ok")
-except Exception as e:
-    print("")
-    print(e)
-    print(e.args[0])
-    try:
-        print("EspError:", EspError.err_to_name(EspError(), 202))
-    except:
-        print(" Approve pull request #6638, https://github.com/micropython/micropython/pull/6638")
-        print('  to see the "EspError: ESP_ERR_TCPIP_ADAPTER_DHCP_ALREADY_STARTED"')
-    print("")
-
-while 1:
-    time.sleep(1)
+# print(socket.getaddrinfo(wlan.ifconfig()[0], 80)[0][-1])
+# print(socket.getaddrinfo('www.micropython.org', 80)[0][-1])
+# print(socket.getaddrinfo('micropython.org', 80)[0][-1])
+# print(socket.getaddrinfo('google.com', 80)[0][-1])
+# print(socket.getaddrinfo('127.0.0.1', 80)[0][-1])
+# try:
+#     #print("try: socket.getaddrinfo(wlan.config('dhcp_hostname'), 80)[0][-1]", end=' ')
+#     #print(socket.getaddrinfo(wlan.config('dhcp_hostname'), 80)[0][-1])
+#     print(socket.getaddrinfo('espressif.local', 80)[0][-1])
+#     #print("- Ok")
+# except Exception as e:
+#     print("")
+#     print(e)
+#     print(e.args[0])
+#     try:
+#         print("EspError:", EspError.err_to_name(EspError(), 202))
+#     except:
+#         print(" Approve pull request #6638, https://github.com/micropython/micropython/pull/6638")
+#         print('  to see the "EspError: ESP_ERR_TCPIP_ADAPTER_DHCP_ALREADY_STARTED"')
+#     print("")
 
 
 def show_index_page(request):
