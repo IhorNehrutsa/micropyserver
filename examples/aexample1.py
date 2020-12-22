@@ -24,20 +24,20 @@ print("wlan.isconnected():", wlan.isconnected())
 
 pin = Pin(PIN_NUMBER, Pin.OUT, value=0)
 
-async def show_index_page(request):
-    await server.send("THIS IS INDEX PAGE")
+async def show_index_page(swriter, request):
+    await server.send(swriter, "THIS IS INDEX PAGE")
 
 
-async def show_info_page(request):
-    await server.send("THIS IS INFO PAGE")
+async def show_info_page(swriter, request):
+    await server.send(swriter, "THIS IS INFO PAGE")
 
 
-async def show_pin_page(request):
+async def show_pin_page(swriter, request):
     if request.startswith("GET /on HTTP"):
         pin.value(1)
     elif request.startswith("GET /off HTTP"):
         pin.value(0)
-    await server.send("PIN IS " + ("ON" if pin.value() == 1 else "OFF"))
+    await server.send(swriter, "PIN IS " + ("ON" if pin.value() == 1 else "OFF"))
 
 
 server = aMicroPyServer(host=wlan.ifconfig()[0], backlog=1)

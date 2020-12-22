@@ -46,8 +46,6 @@ class aMicroPyServer(object):
         self.backlog = backlog
         self.timeout = timeout
         
-        self.swriter = None
-
         self._counter = 0  # Remove it in the production release.
 
     async def start(self):
@@ -59,52 +57,48 @@ class aMicroPyServer(object):
 
     async def run_client(self, sreader, swriter):
         self.start_time = utime.ticks_ms()
-        print('Got connection from client', self, sreader, sreader.s.fileno(), sreader.e['peername'])
-        self.swriter = swriter
+        #print('Got connection from client', self, sreader, sreader.s.fileno(), sreader.e['peername'])
         try:
-            if sreader.s.fileno() != -1:
-                request = b''
-                while True:
-                    try:
-                        res = await asyncio.wait_for(sreader.readline(), self.timeout)
-                        request += res
-                        if res == b'\r\n':  # end of HTTP request
-                            break
-                    except asyncio.TimeoutError as e:
-                        print(1, e, "asyncio.TimeoutError", self.timeout)
-                        res = b''
-                    if res == b'':  # socket connection broken
-                        print('raise OSError')
-                        raise OSError
+            request = b''
+            while True:
+                try:
+                    res = await asyncio.wait_for(sreader.readline(), self.timeout)
+                    request += res
+                    if res == b'\r\n':  # end of HTTP request
+                        break
+                except asyncio.TimeoutError as e:
+                    print(1, e, "asyncio.TimeoutError", self.timeout)
+                    res = b''
+                if res == b'':  # socket connection broken
+                    print('raise OSError')
+                    raise OSError
+            
+            if request:
+                request = str(request, "utf8")
+                #print('request >>>{}<<<'.format(request))
                 
-                if request:
-                    request = str(request, "utf8")
-                    print('request >>>>{}<<<<'.format(request))
-                    
-                    try:
-                        route = self.find_route(request)
-                        if route:
-                            #print("route", route)
-                            await route["handler"](request)
-                        else:
-                            await self.not_found()
-                    except Exception as e:
-                        print(2, e)
-                        self.internal_error(e)
-                        raise
+                try:
+                    route = self.find_route(request)
+                    if route:
+                        await route["handler"](swriter, request)
+                    else:
+                        await self.not_found(swriter)
+                    #1/0  # test internal_error
+                except Exception as e:
+                    print(2, e)
+                    self.internal_error(swriter, e)
+                    raise
                         
         except OSError as e:
             print(3, e)
             pass
-        if swriter.s.fileno() != -1:
-            print('Client disconnect.', self, swriter, swriter.s.fileno(), swriter.e['peername'])
-            await swriter.wait_closed()
-            await asyncio.sleep(0.2)
-            print('Client socket closed.', self, swriter, swriter.s.fileno(), swriter.e['peername'])
+        swriter_s_fileno = swriter.s.fileno()
+        await swriter.wait_closed()
+        #print('Client socket closed.', self, swriter, swriter_s_fileno, swriter.s.fileno(), swriter.e['peername'])
+        
         print('Render time: %i ms' % utime.ticks_diff(utime.ticks_ms(), self.start_time))
-            
         gc.collect()
-        print('----------------------------------------------------------------------------------')
+        #print('---------------------------------------------------------------')
 
     async def close(self):
         print('Closing server...')
@@ -116,37 +110,34 @@ class aMicroPyServer(object):
         """ Add new route  """
         self._routes.append({"path": path, "handler": handler, "method": method})
 
-    async def _write(self, response):
-        print(response)
-        self.swriter.write(response)
-        
-    async def send(self, response, status=200, content_type="Content-Type: text/plain", extra_headers=[]):
+    async def send(self, swriter, response, status=200, content_type="Content-Type: text/plain", extra_headers=[]):
         """ Send response to client """
 
-        if self.swriter is None:
+        if swriter is None:
             raise Exception("Can't send response, no connection instance")
 
         status_message = {200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found",
                           500: "Internal Server Error"}
-        await self._write("HTTP/1.0 " + str(status) + " " + status_message[status] + "\r\n")
-        await self._write(content_type + "\r\n")
+        swriter.write("HTTP/1.0 " + str(status) + " " + status_message[status] + "\r\n")
+        swriter.write(content_type + "\r\n")
         for header in extra_headers:
-            await self._write(header + "\r\n")
-        ### await self._write("X-Powered-By: MicroPyServer\r\n")  # not required, vainglory
-        await self._write("Cache-Control: no-store\r\n")  # The response may not be stored in any cache.
-                                                          # This is necessary to execute the code on the server:
-                                                          # switch PIN ON and switch PIN OFF.
-                                                          # This prevents showing the cashed text
-                                                          # when a user presses the "Backward/Forward" button in a browser.
-        await self._write("\r\n")  # end of HTTP header
+            swriter.write(header + "\r\n")
+        ### await swriter.write("X-Powered-By: MicroPyServer\r\n")  # not required, vainglory
+        swriter.write("Cache-Control: no-store\r\n")  # The response may not be stored in any cache.
+                                                      # This is necessary to execute the code on the server:
+                                                      # switch PIN ON and switch PIN OFF.
+                                                      # This prevents showing the cashed text
+                                                      # when a user presses the "Backward/Forward" button in a browser.
+        swriter.write("\r\n")  # end of HTTP header
+        await swriter.drain()
+
         self._counter += 1
-        await self._write(str(self._counter) + ' ' + response)
+        swriter.write(str(self._counter) + '\r\n')
+        swriter.write(response)
         
-        #print("swriter.out_buf >>>", self.swriter.out_buf, '<<<')
-        await self.swriter.drain()
-        print("swriter.out_buf >>>", self.swriter.out_buf, '<<<')
-        print("Finished processing request.")
-        
+        #print("swriter.out_buf >>>{}<<<".format(swriter.out_buf))
+        await swriter.drain()
+        #print("Finished processing request.")
         
     def find_route(self, request):
         """ Find route """
@@ -159,27 +150,25 @@ class aMicroPyServer(object):
                     continue
                 path = re.search("^[A-Z]+\\s+(/[-a-zA-Z0-9_.]*)", lines[0]).group(1)
                 if path == route["path"]:
-                    print('1', method, path, route["path"])
                     return route
                 else:
                     match = re.search("^" + route["path"] + "$", path)
                     if match:
-                        print('2', method, path, route["path"])
                         return route
         return None
     
-    async def not_found(self):
+    async def not_found(self, swriter):
         """ Not found action """
-        await self.send("404", status=404)
+        await self.send(swriter, "404 Not found", status=404)
 
-    def internal_error(self, error):
+    async def internal_error(self, swriter, error):
         """ Catch error action """
         output = io.StringIO()
         sys.print_exception(error, output)
         str_error = output.getvalue()
         output.close()
         if swriter.s.fileno() != -1:
-            self.send("Error: " + str_error, status=500)
+            await self.send(swriter, "Error: " + str_error, status=500)
 
     def on_request(self, handler):
         """ Set request handler """
