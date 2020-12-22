@@ -40,6 +40,7 @@ class MicroPyServer(object):
         self._routes = []
         self._connect = None
         self._on_request_handler = None
+        self._counter = 0  # Remove it in the production release.
 
     def start(self):
         """ Start server """
@@ -47,11 +48,14 @@ class MicroPyServer(object):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((self._host, self._port))
         sock.listen(1)
+        sock.settimeout(2)
         while True:
             try:
                 self._connect, address = sock.accept()
+                print('self._connect, address', self._connect, address)
+                self._connect.settimeout(1)
                 request = self._get_request()
-                if len(request) == 0:
+                if len(request) == 0:  # socket connection broken
                     self._connect.close()
                     continue
                 if self._on_request_handler:
@@ -63,9 +67,12 @@ class MicroPyServer(object):
                 else:
                     self.not_found()
             except Exception as e:
-                    self.internal_error(e)
+                self.internal_error(e)
             finally:
-                self._connect.close()
+                if self._connect:
+                    self._connect.close()  # After answering, the connection should be closed.
+                    print('finally:self._connect.close()\n')
+                    self._connect = None
 
     def add_route(self, path, handler, method="GET"):
         """ Add new route  """
@@ -74,6 +81,7 @@ class MicroPyServer(object):
     def send(self, response, status=200, content_type="Content-Type: text/plain", extra_headers=[]):
         """ Send response to client """
         if self._connect is None:
+            return
             raise Exception("Can't send response, no connection instance")
 
         status_message = {200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found",
@@ -82,8 +90,15 @@ class MicroPyServer(object):
         self._connect.sendall(content_type + "\r\n")
         for header in extra_headers:
             self._connect.sendall(header + "\r\n")
-        self._connect.sendall("X-Powered-By: MicroPyServer\r\n")
+        ### self._connect.sendall("X-Powered-By: MicroPyServer\r\n")  # not required, vainglory
+        self._connect.sendall("Cache-Control: no-store\r\n")  # The response may not be stored in any cache.
+                                                              # This is necessary to execute the code on the server:
+                                                              # switch PIN ON and switch PIN OFF.
+                                                              # This prevents showing the cashed text
+                                                              # when a user presses the "Backward/Forward" button in a browser.
         self._connect.sendall("\r\n")
+        self._counter += 1
+        self._connect.sendall(str(self._counter) + "\r\n")
         self._connect.sendall(response)
 
     def find_route(self, request):
@@ -112,7 +127,7 @@ class MicroPyServer(object):
         sys.print_exception(error, output)
         str_error = output.getvalue()
         output.close()
-        self.send("Error: " + str_error, status=500)
+        #self.send("Error: " + str_error, status=500)
 
     def on_request(self, handler):
         """ Set request handler """
