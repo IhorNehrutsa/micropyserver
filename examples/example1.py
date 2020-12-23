@@ -15,9 +15,9 @@ wlan_id = "your wi-fi"
 wlan_pass = "your password"
 
 wlan = network.WLAN(network.STA_IF)
-wlan.active(True)
-if not wlan.isconnected():
-    wlan.connect(wlan_id, wlan_pass)
+# wlan.active(True)
+# if not wlan.isconnected():
+#     wlan.connect(wlan_id, wlan_pass)
 
 print("wlan.ifconfig():", wlan.ifconfig())
 print("wlan.isconnected():", wlan.isconnected())

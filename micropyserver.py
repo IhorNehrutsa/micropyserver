@@ -29,6 +29,7 @@ import re
 import socket
 import sys
 import io
+import utime
 
 
 class MicroPyServer(object):
@@ -52,7 +53,8 @@ class MicroPyServer(object):
         while True:
             try:
                 self._connect, address = sock.accept()
-                print('self._connect, address', self._connect, address)
+                self.start_time = utime.ticks_ms()
+                #print('self._connect, address', self._connect, address)
                 self._connect.settimeout(1)
                 request = self._get_request()
                 if len(request) == 0:  # socket connection broken
@@ -71,7 +73,8 @@ class MicroPyServer(object):
             finally:
                 if self._connect:
                     self._connect.close()  # After answering, the connection should be closed.
-                    print('finally:self._connect.close()\n')
+                    print('Render time: %i ms' % utime.ticks_diff(utime.ticks_ms(), self.start_time))
+                    #print('finally:self._connect.close()\n')
                     self._connect = None
 
     def add_route(self, path, handler, method="GET"):

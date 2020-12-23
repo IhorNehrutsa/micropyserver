@@ -60,12 +60,30 @@ class aMicroPyServer(object):
         #print('Got connection from client', self, sreader, sreader.s.fileno(), sreader.e['peername'])
         try:
             request = b''
+            res = b''
             while True:
                 try:
+                    '''
+                    # 450-550 ms
                     res = await asyncio.wait_for(sreader.readline(), self.timeout)
                     request += res
                     if res == b'\r\n':  # end of HTTP request
                         break
+                    '''
+                    
+                    # 150-250 ms
+                    res = await asyncio.wait_for(sreader.read(1024), self.timeout)
+                    print(res)
+                    request += res
+                    if request[-4:] == b'\r\n\r\n':  # end of HTTP request
+                        break
+                    '''
+                    # 150-250 ms
+                    request = await asyncio.wait_for(sreader.readline(), self.timeout)
+                    res = await asyncio.wait_for(sreader.read(1024), self.timeout)
+                    if res[-4:] == b'\r\n\r\n':  # end of HTTP request
+                        break
+                    '''
                 except asyncio.TimeoutError as e:
                     print(1, e, "asyncio.TimeoutError", self.timeout)
                     res = b''
@@ -118,8 +136,9 @@ class aMicroPyServer(object):
 
         status_message = {200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found",
                           500: "Internal Server Error"}
-        swriter.write("HTTP/1.0 " + str(status) + " " + status_message[status] + "\r\n")
-        swriter.write(content_type + "\r\n")
+        swriter.write("HTTP/1.0 " + str(status) + " " + status_message[status] + "\r\n" + \
+                      content_type + "\r\n")
+        await swriter.drain()
         for header in extra_headers:
             swriter.write(header + "\r\n")
         ### await swriter.write("X-Powered-By: MicroPyServer\r\n")  # not required, vainglory
@@ -138,7 +157,23 @@ class aMicroPyServer(object):
         #print("swriter.out_buf >>>{}<<<".format(swriter.out_buf))
         await swriter.drain()
         #print("Finished processing request.")
-        
+
+    def find_route(self, request):
+        """ Find route """
+        method = re.search("^([A-Z]+)", request).group(1)
+        for route in self._routes:
+            if method != route["method"]:
+                continue
+            path = re.search("^[A-Z]+\\s+(/[-a-zA-Z0-9_.]*)", request).group(1)
+            if path == route["path"]:
+                return route
+            else:
+                match = re.search("^" + route["path"] + "$", path)
+                if match:
+                    return route
+        return None
+
+    '''    
     def find_route(self, request):
         """ Find route """
         lines = request.split("\r\n")
@@ -156,7 +191,7 @@ class aMicroPyServer(object):
                     if match:
                         return route
         return None
-    
+    '''    
     async def not_found(self, swriter):
         """ Not found action """
         await self.send(swriter, "404 Not found", status=404)
